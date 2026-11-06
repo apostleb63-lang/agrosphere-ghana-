@@ -1,1 +1,121 @@
-index.html.
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgroSphere | Fresh food. Smarter agriculture. Connected markets.</title>
+<style>
+:root{--g:#147a3d;--mint:#eaf5ed;--ink:#102b4e;--muted:#64748b;--line:#dbe5ee;--navy:#082b52;--deep:#061f3d}
+*{box-sizing:border-box}body{margin:0;background:#f3f7f8;color:var(--ink);font-family:system-ui,-apple-system,sans-serif}.app{max-width:1180px;margin:auto;background:white;min-height:100vh;box-shadow:0 8px 40px #082b5210}header{background:linear-gradient(115deg,var(--deep),#0d5c3a 72%,#16804b);color:white;padding:24px 22px 22px}.brandline{display:flex;align-items:center;gap:12px}.brandmark{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:#ffffff1c;border:1px solid #ffffff55;font-size:30px}.hero-note{margin-top:18px!important;color:#e2f4e8;font-size:14px}h1{margin:0 0 4px;font-size:30px;letter-spacing:-.7px}header p{margin:0}.nav{display:flex;gap:8px;overflow:auto;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:5}.nav button,.btn{border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer}.nav button{background:var(--mint);color:var(--g);white-space:nowrap;border:1px solid #d9eadf}.btn{background:var(--g);color:white;box-shadow:0 3px 9px #147a3d20}.btn.secondary{background:white;color:var(--g);border:1px solid var(--line)}main{padding:22px}h2{color:var(--navy);letter-spacing:-.4px}h3{color:var(--navy)}.notice{background:#fff8e5;border:1px solid #f0d99b;padding:12px;border-radius:10px;margin:10px 0;font-size:14px}.cats{display:flex;gap:7px;overflow:auto;margin:14px 0}.cat{border:1px solid var(--line);border-radius:30px;background:white;padding:9px 12px;white-space:nowrap}.cat.active{background:var(--g);color:white}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.card,.panel{border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0;background:#fff;box-shadow:0 4px 16px #082b5208}.price{font-weight:800;color:var(--g);font-size:19px}.muted{color:var(--muted);font-size:13px}.field{margin:12px 0}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:5px}.field input,.field select,.field textarea{width:100%;padding:12px;border:1px solid #cfddd2;border-radius:9px;font:inherit;background:white}.field textarea{min-height:70px}.hidden{display:none}.status{padding:10px;background:var(--mint);border-radius:9px;margin:10px 0;font-size:14px}footer{padding:20px;text-align:center;color:#dce8f5;background:var(--navy);font-size:12px;border-top:1px solid var(--line)}footer small{display:block;margin-top:7px;color:#b8c9dc}@media(max-width:600px){main{padding:15px}.grid{grid-template-columns:1fr}h1{font-size:26px}.brandmark{width:46px;height:46px}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body><div class="app">
+<header><div class="brandline"><div class="brandmark" aria-hidden="true">🌍</div><div><h1>AgroSphere</h1><p>Fresh food. Smarter agriculture. Connected markets.</p></div></div><p class="hero-note">Connecting farmers, households and food businesses — starting in Ghana.</p></header>
+<nav class="nav"><button onclick="showPage('market')">🏡 Marketplace</button><button onclick="showPage('sell')">＋ List produce</button><button onclick="showPage('account')">👤 Seller account</button></nav>
+<main id="main"><div class="status">Loading AgroSphere…</div></main>
+<footer>AgroSphere · Connecting farmers, households and food businesses. Buyers can send order requests through WhatsApp; sellers must confirm availability, delivery and payment.<small>Starting in Ghana, with a vision to connect markets across Africa.</small></footer>
+</div>
+<script>
+const SUPABASE_URL='https://pursdmdcfohrkgxhalfq.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_uVBxSbaetYx235QsUG9tlQ_WT69pgrg';
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const categories=['All','Plantain','Vegetables','Roots & Tubers','Grains & Legumes','Fruits','Poultry & Eggs'];
+let currentPage='market', listings=[], activeCategory='All', user=null, recoveryMode=false;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>'GH₵ '+Number(n||0).toLocaleString('en-GH',{maximumFractionDigits:2});
+function showPage(p){currentPage=p;if(p==='market')renderMarket();if(p==='sell')renderSell();if(p==='account')renderAccount();}
+function message(s){const el=document.getElementById('msg');if(el)el.textContent=s;else alert(s);}
+async function loadListings(){
+ const {data,error}=await db.from('produce_listings').select('*').eq('available',true).order('created_at',{ascending:false});
+ if(error){listings=[];return error.message;} listings=data||[];return '';
+}
+async function renderMarket(){
+ currentPage='market';document.getElementById('main').innerHTML='<h2>Discover fresh produce</h2><p class="muted">Listings shared by farmers and produce sellers.</p><div class="field"><label>Search produce or location</label><input id="search" placeholder="e.g. plantain, tomatoes, Kumasi" oninput="drawListings()"></div><div id="cats" class="cats"></div><div id="results" class="status">Loading real listings…</div>';
+ const err=await loadListings();document.getElementById('cats').innerHTML=categories.map(c=>`<button class="cat ${c===activeCategory?'active':''}" onclick="activeCategory='${c}';drawListings()">${c}</button>`).join('');
+ if(err)document.getElementById('results').innerHTML=`Could not load listings: ${esc(err)}<br><br>Check Supabase Data API access and table policies.`;
+ else drawListings();
+}
+function orderViaWhatsApp(phone, product, price, unit, availableQty){
+  if(!phone){alert('This seller has not provided a WhatsApp number.');return;}
+  const raw=String(phone).replace(/\\D/g,'');
+  const waNumber=raw.startsWith('0')?'233'+raw.slice(1):raw.startsWith('233')?raw:raw;
+  const maxQty=Number(availableQty);
+  const answer=prompt(`How many ${unit||'units'} of ${product} would you like to order?\\nAvailable: ${availableQty}\\nPrice: ${money(price)} per ${unit||'unit'}`);
+  if(answer===null)return;
+  const qty=Number(answer);
+  if(!Number.isFinite(qty)||qty<=0){alert('Please enter a valid quantity greater than zero.');return;}
+  if(Number.isFinite(maxQty)&&maxQty>0&&qty>maxQty){alert(`Only ${availableQty} ${unit||'units'} are currently listed as available.`);return;}
+  const total=qty*Number(price||0);
+  const msg=`Hello, I would like to order through AgroSphere.\\nProduct: ${product}\\nQuantity: ${qty} ${unit||'unit(s)'}\\nUnit price: ${money(price)}\\nEstimated total: ${money(total)}\\nPlease confirm availability, delivery, and payment details.`;
+  window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`,'_blank','noopener');
+}
+function drawListings(){
+ const q=(document.getElementById('search')?.value||'').toLowerCase();
+ const arr=listings.filter(p=>(activeCategory==='All'||p.category===activeCategory)&&`${p.full_name||''} ${p.category||''} ${p.description||''} ${p.location||''}`.toLowerCase().includes(q));
+ const out=document.getElementById('results');if(!out)return;
+ out.className='';
+ out.innerHTML=arr.length?`<div class="grid">${arr.map(p=>{const itemName=String(p.description||p.title||p.category||'').toLowerCase();const produceIcon=/plantain/.test(itemName)?'PLANTAIN_PHOTO':/tomato|tomatoes/.test(itemName)?'TOMATO_PHOTO':/banana/.test(itemName)?'🍌':/cabbage|lettuce/.test(itemName)?'🥬':/onion/.test(itemName)?'🧅':/pepper/.test(itemName)?'🌶️':/cassava/.test(itemName)?'CASSAVA_PHOTO':/yam/.test(itemName)?'🍠':/maize|corn|grain/.test(itemName)?'🌽':/rice/.test(itemName)?'🍚':/orange/.test(itemName)?'🍊':/mango/.test(itemName)?'🥭':/pineapple/.test(itemName)?'🍍':/egg|poultry|chicken/.test(itemName)?'🥚':({'Plantain':'🌿','Vegetables':'🥬','Roots & Tubers':'🥔','Grains & Legumes':'🌽','Fruits':'🍊','Poultry & Eggs':'🥚'})[p.category]||'🌱';return `<article class="card"><div aria-label="${esc(p.description||'Produce')}" style="font-size:64px;min-height:90px;display:flex;align-items:center;justify-content:center">${produceIcon==='PLANTAIN_PHOTO'?`<img src="https://commons.wikimedia.org/wiki/Special:FilePath/Fresh_Green_Plantain.jpg?width=600" alt="Photograph of fresh green plantains" loading="lazy" style="width:150px;height:90px;object-fit:cover;border-radius:8px" onerror="this.replaceWith(document.createTextNode('🌿'))">`:produceIcon==='TOMATO_PHOTO'?`<img src="https://commons.wikimedia.org/wiki/Special:FilePath/Ripe_Red_Tomatoes.jpg?width=600" alt="Photograph of ripe red tomatoes" loading="lazy" style="width:150px;height:90px;object-fit:cover;border-radius:8px" onerror="this.replaceWith(document.createTextNode('🍅'))">`:produceIcon==='CASSAVA_PHOTO'?`<img src="https://commons.wikimedia.org/wiki/Special:FilePath/Cassava.jpg?width=600" alt="Photograph of cassava roots" loading="lazy" style="width:150px;height:90px;object-fit:cover;border-radius:8px" onerror="this.replaceWith(document.createTextNode('🌿'))">`:produceIcon}</div><h3>${esc(p.description||p.title||p.category||'Produce')}</h3><div class="price">${money(p.price)} / ${esc(p.unit||'unit')}</div><p class="muted">${esc(p.category)} · ${esc(p.location)}<br>Seller: ${esc(p.full_name||'Farmer')}<br>Quantity: ${esc(p.quantity)}</p>${p.contact_phone||p.phone?`<a href="https://wa.me/${String(p.contact_phone||p.phone).replace(/\\D/g,'')}" target="_blank" rel="noopener">Contact seller on WhatsApp</a><p><button class="btn" onclick="orderViaWhatsApp('${esc(p.contact_phone||p.phone)}','${esc(p.description||p.title||p.category||'Produce')}',${Number(p.price)||0},'${esc(p.unit||'unit')}',${Number(p.quantity)||0})">Order via WhatsApp</button></p>`:'Contact number not provided'}</article>`}).join('')}</div>`:'<div class="panel">No real listings found yet. Sign in as a farmer and add the first listing.</div>';
+}
+function renderAccount(){
+ currentPage='account';
+ document.getElementById('main').innerHTML=`<h2>Seller account</h2><div class="notice">Create an account or sign in to publish produce. Use an email address you can access.</div><div class="panel"><h3>Create farmer account</h3><form onsubmit="signUp(event)"><div class="field"><label>Full name</label><input name="name" required></div><div class="field"><label>Phone</label><input name="phone" required></div><div class="field"><label>Location</label><input name="location" required placeholder="Town / region"></div><div class="field"><label>Email</label><input name="email" type="email" required></div><div class="field"><label>Password (at least 6 characters)</label><input name="password" type="password" minlength="6" required></div><button class="btn">Create account</button></form></div><div class="panel"><h3>Already registered? Sign in</h3><form onsubmit="signIn(event)"><div class="field"><label>Email</label><input name="email" type="email" required></div><div class="field"><label>Password</label><input name="password" type="password" required></div><button class="btn">Sign in</button></form><button class="btn secondary" onclick="signOut()">Sign out</button><p id="msg" class="status">${user?'Signed in as '+esc(user.email):'Not signed in'}</p></div>${user?`<div class="panel"><h3>My orders</h3><p class="muted">Review orders saved in AgroSphere. WhatsApp requests are not automatically saved here.</p><button class="btn" onclick="loadMyOrders()">Refresh orders</button><div id="myOrders" class="status">Tap Refresh orders to load your orders.</div></div>`:''}<div class="panel"><h3>Forgot password?</h3><form onsubmit="sendRecovery(event)"><div class="field"><label>Email</label><input name="email" type="email" required placeholder="Your account email"></div><button class="btn secondary">Send reset email</button></form></div>`;
+}
+async function loadMyOrders(){
+ const box=document.getElementById('myOrders');
+ if(!box)return;
+ if(!user){box.textContent='Please sign in to view orders.';return;}
+ box.textContent='Loading your orders…';
+ const {data:orders,error}=await db.from('orders').select('id, listing_id, buyer_name, buyer_phone, quantity, unit_price, total_price, status, created_at').eq('seller_id',user.id).order('created_at',{ascending:false});
+ if(error){box.textContent='Could not load orders: '+error.message;return;}
+ if(!orders||!orders.length){box.textContent='No saved orders yet. Buyer requests sent only through WhatsApp will not appear here.';return;}
+ const listingIds=[...new Set(orders.map(o=>o.listing_id).filter(Boolean))];
+ let listingNames={};
+ if(listingIds.length){
+  const {data:items}=await db.from('produce_listings').select('id, title, description, unit').in('id',listingIds);
+  (items||[]).forEach(item=>listingNames[item.id]=item);
+ }
+ box.className='';
+ box.innerHTML=orders.map(o=>{
+  const item=listingNames[o.listing_id]||{};
+  return `<div class="panel"><strong>${esc(item.description||item.title||'Produce order')}</strong><p>Quantity: ${esc(o.quantity)} ${esc(item.unit||'units')}</p><p>Unit price: ${money(o.unit_price)} · Total: ${money(o.total_price)}</p><p>Status: <strong>${esc(o.status)}</strong></p><p class="muted">${esc(new Date(o.created_at).toLocaleString())}</p><div class="field"><label>Update status</label><select id="order-status-${esc(o.id)}"><option value="pending" ${o.status==='pending'?'selected':''}>Pending</option><option value="accepted" ${o.status==='accepted'?'selected':''}>Accepted</option><option value="completed" ${o.status==='completed'?'selected':''}>Completed</option><option value="cancelled" ${o.status==='cancelled'?'selected':''}>Cancelled</option></select></div><button class="btn" onclick="updateOrderStatus('${esc(o.id)}')">Save status</button></div>`;
+ }).join('');
+}
+async function updateOrderStatus(id){
+ const select=document.getElementById('order-status-'+id);
+ if(!select||!user)return;
+ const status=select.value;
+ const {error}=await db.from('orders').update({status}).eq('id',id).eq('seller_id',user.id);
+ if(error){alert('Could not update order status: '+error.message);return;}
+ alert('Order status updated.');
+ loadMyOrders();
+}
+
+async function sendRecovery(e){
+ e.preventDefault();const f=new FormData(e.target);const {error}=await db.auth.resetPasswordForEmail(f.get('email'),{redirectTo:location.origin+location.pathname});if(error)return message('Could not send reset email: '+error.message);message('Password reset email sent. Open it on this device, then return to this page.');
+}
+function renderPasswordRecovery(){
+ currentPage='account';document.getElementById('main').innerHTML=`<h2>Choose a new password</h2><div class="notice">Enter a new password for your AgroSphere account.</div><form class="panel" onsubmit="saveNewPassword(event)"><div class="field"><label>New password (at least 6 characters)</label><input name="password" type="password" minlength="6" required></div><div class="field"><label>Type new password again</label><input name="confirm" type="password" minlength="6" required></div><button class="btn">Save new password</button><p id="msg" class="status"></p></form>`;
+}
+async function saveNewPassword(e){
+ e.preventDefault();const f=new FormData(e.target);if(f.get('password')!==f.get('confirm'))return message('The passwords do not match.');const {data,error}=await db.auth.updateUser({password:f.get('password')});if(error)return message('Could not update password: '+error.message);recoveryMode=false;user=data.user;history.replaceState(null,'',location.pathname);message('Password updated. You can now use your new password to sign in.');renderAccount();
+}
+async function signUp(e){
+ e.preventDefault();const f=new FormData(e.target),name=f.get('name'),phone=f.get('phone'),location=f.get('location'),email=f.get('email'),password=f.get('password');
+ const {data,error}=await db.auth.signUp({email,password,options:{data:{full_name:name,phone,location}}});
+ if(error)return message(error.message);
+ if(data.user){const {error:pe}=await db.from('farmer_profiles').upsert({id:data.user.id,full_name:name,phone,location},{onConflict:'id'});if(pe)return message('Account created, but profile save failed: '+pe.message);}
+ message('Account request submitted. If email confirmation is enabled, check your email and confirm before signing in.');
+}
+async function signIn(e){e.preventDefault();const f=new FormData(e.target);const {data,error}=await db.auth.signInWithPassword({email:f.get('email'),password:f.get('password')});if(error)return message(error.message);user=data.user;message('Signed in successfully. You can now list produce.');renderAccount();}
+async function signOut(){await db.auth.signOut();user=null;renderAccount();message('Signed out.');}
+function renderSell(){
+ currentPage='sell';document.getElementById('main').innerHTML=`<h2>List your produce</h2><div class="notice">Create a seller account and sign in first. Your listing will be stored in the shared AgroSphere marketplace database.</div><form class="panel" onsubmit="publishListing(event)"><div class="field"><label>Produce name / description</label><input name="description" required placeholder="e.g. Fresh green plantain"></div><div class="field"><label>Category</label><select name="category" required>${categories.slice(1).map(c=>`<option>${c}</option>`).join('')}</select></div><div class="field"><label>Price in Ghana cedis (GH₵)</label><input name="price" type="number" min="0.01" step="0.01" required></div><div class="field"><label>Unit</label><input name="unit" required placeholder="bag, crate, bunch, kg"></div><div class="field"><label>Quantity available</label><input name="quantity" type="number" min="1" required></div><div class="field"><label>Your location</label><input name="location" required></div><div class="field"><label>Contact phone / WhatsApp</label><input name="contact_phone" required></div><div class="field"><label>Payment method</label><select name="payment_method"><option>Cash</option><option>Mobile Money</option><option>Bank transfer</option><option>Discuss with buyer</option></select></div><div class="field"><label>Image URL (optional)</label><input name="image_url" type="url" placeholder="https://..."></div><button class="btn">Publish listing</button><p id="msg" class="status"></p></form>`;
+}
+async function publishListing(e){
+ e.preventDefault();if(!user){message('Please create an account or sign in first.');showPage('account');return;}
+ const f=new FormData(e.target);const row={farmer_id:user.id,title:f.get('description'),full_name:user.user_metadata?.full_name||user.email,phone:user.user_metadata?.phone||'',category:f.get('category'),description:f.get('description'),price:Number(f.get('price')),unit:f.get('unit'),quantity:Number(f.get('quantity')),location:f.get('location'),contact_phone:f.get('contact_phone'),payment_method:f.get('payment_method'),image_url:f.get('image_url')||null,available:true};
+ const {error}=await db.from('produce_listings').insert(row);if(error){message('Could not publish listing: '+error.message);return;}message('Listing published! Buyers can now see it.');showPage('market');
+}
+db.auth.onAuthStateChange((event,session)=>{user=session?.user||null;if(event==='PASSWORD_RECOVERY'){recoveryMode=true;renderPasswordRecovery();}});
+db.auth.getSession().then(({data})=>{user=data.session?.user||null;if(location.hash.includes('type=recovery')||location.search.includes('type=recovery')){recoveryMode=true;renderPasswordRecovery();}else{renderMarket();}});
+</script></body></html
